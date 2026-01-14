@@ -7,8 +7,5 @@
 ## SavedVariables: MiniHealerRangeDB
 ## X-Curse-Project-ID: 1429245
 
-Libs\LibStub-1.0\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
-Libs\LibRangeCheck-3.0\LibRangeCheck-3.0.lua
 MiniFramework.lua
 MiniHealerRange.lua
