@@ -1,0 +1,197 @@
+local addonName, addon = ...
+---@type MiniFramework
+local mini = addon.Framework
+local frame
+local updateInterval = 0.5
+local draggable
+local text
+local ticker
+---@type Db
+local db
+---@class Db
+local dbDefaults = {
+	Version = 1,
+	Point = "TOP",
+	RelativeTo = "UIParent",
+	RelativePoint = "TOP",
+	X = 0,
+	Y = -200,
+	Message = "No healer in range",
+	FontPath = "Fonts\\FRIZQT__.TTF",
+	FontSize = 24,
+	FontFlags = "OUTLINE",
+	FontColor = {
+		R = 1,
+		G = 0,
+		B = 0,
+		A = 1,
+	},
+	PaddingX = 10,
+	PaddingY = 10,
+}
+
+local function ApplyPosition()
+	local point = db.Point or dbDefaults.Point
+	local relativePoint = db.RelativePoint or dbDefaults.RelativePoint
+	local relativeTo = (db.RelativeTo and _G[db.RelativeTo]) or UIParent
+	local x = (type(db.X) == "number") and db.X or dbDefaults.X
+	local y = (type(db.Y) == "number") and db.Y or dbDefaults.Y
+
+	draggable:ClearAllPoints()
+	draggable:SetPoint(point, relativeTo, relativePoint, x, y)
+end
+
+local function SavePosition()
+	local point, relativeTo, relativePoint, x, y = draggable:GetPoint(1)
+
+	db.Point = point
+	db.RelativeTo = relativeTo
+	db.RelativePoint = relativePoint
+	db.X = x
+	db.Y = y
+end
+
+local function ResizeDraggableToText()
+	local w = text:GetStringWidth() or 0
+	local h = text:GetStringHeight() or 0
+
+	if w < 1 then
+		w = 1
+	end
+	if h < 1 then
+		h = 1
+	end
+
+	draggable:SetSize(w + (db.PaddingX or 0) * 2, h + (db.PaddingY or 0) * 2)
+end
+
+local function ApplyFontStyle()
+	text:SetFont(db.FontPath or "Fonts\\FRIZQT__.TTF", db.FontSize or 18, db.FontFlags or "OUTLINE")
+
+	local c = db.FontColor
+	local r, g, b, a = 1, 1, 1, 1
+
+	if type(c) == "table" then
+		r = (type(c.R) == "number") and c.R or r
+		g = (type(c.G) == "number") and c.G or g
+		b = (type(c.B) == "number") and c.B or b
+		a = (type(c.A) == "number") and c.A or a
+	end
+
+	text:SetTextColor(r, g, b, a)
+end
+
+local function StopTicker()
+	if ticker then
+		ticker:Cancel()
+		ticker = nil
+	end
+end
+
+local function IsHealer(unit)
+	return UnitGroupRolesAssigned(unit) == "HEALER"
+end
+
+local function FindHealer()
+	local inRaid = IsInRaid()
+	local prefix = inRaid and "raid" or "party"
+	local count = inRaid and (MAX_RAID_MEMBERS or 40) or (MAX_PARTY_MEMBERS or 4)
+	local healer = nil
+
+	for i = 1, count do
+		local unit = prefix .. i
+
+		if IsHealer(unit) then
+			-- just return the first healer we find
+			-- we can't do any smarts with UnitInRange like determining if any single healer is in range
+			-- because we can't do logic conditions on secret booleans
+			-- so it's just luck of the draw whether we picked a healer in range or not
+			-- mostly people use this addon for 3v3, so there'll only ever be 1 healer
+			return unit
+		end
+	end
+
+	return healer
+end
+
+local function Run()
+	if not IsInInstance() or IsHealer("player") then
+		StopTicker()
+		draggable:SetAlpha(0)
+		return
+	end
+
+	local healer = FindHealer()
+
+	if not healer then
+		StopTicker()
+		draggable:SetAlpha(0)
+		return
+	end
+
+	local inRange = UnitInRange(healer)
+	draggable:SetAlphaFromBoolean(inRange, 0, 1)
+end
+
+local function EnsureTicker()
+	if ticker then
+		return
+	end
+
+	ticker = C_Timer.NewTicker(updateInterval, Run)
+end
+
+local function OnEvent()
+	EnsureTicker()
+	ApplyFontStyle()
+	ResizeDraggableToText()
+	Run()
+end
+
+local function OnAddonLoaded()
+	db = mini:GetSavedVars(dbDefaults)
+
+	draggable = CreateFrame("Frame", addonName .. "Frame", UIParent)
+	draggable:SetClampedToScreen(true)
+	draggable:EnableMouse(true)
+	draggable:SetMovable(true)
+
+	-- let us control the position via saved vars
+	if draggable.SetDontSavePosition then
+		draggable:SetDontSavePosition(true)
+	end
+
+	draggable:RegisterForDrag("LeftButton")
+	draggable:SetAlpha(0)
+	draggable:Show()
+
+	draggable:SetScript("OnDragStart", function(self)
+		self:StartMoving()
+	end)
+
+	draggable:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		SavePosition()
+	end)
+
+	ApplyPosition()
+
+	text = draggable:CreateFontString(nil, "OVERLAY")
+	text:SetPoint("CENTER", draggable, "CENTER", 0, 0)
+	text:Show()
+
+	-- must apply font before setting the text
+	ApplyFontStyle()
+
+	text:SetText(db.Message)
+
+	ResizeDraggableToText()
+
+	frame = CreateFrame("Frame")
+	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+
+	frame:SetScript("OnEvent", OnEvent)
+end
+
+mini:WaitForAddonLoad(OnAddonLoaded)

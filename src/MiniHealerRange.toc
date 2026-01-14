@@ -1,0 +1,14 @@
+## Interface: 120001, 120000, 110207, 50503, 40402, 38000, 30405, 20505, 11508
+## Title: MiniHealerRange
+## Notes: Shows a warning message when out of range of your healer.
+## Author: Verz
+## Version: 0.0.1
+## IconTexture: Interface\AddOns\MiniHealerRange\Icon.blp
+## SavedVariables: MiniHealerRangeDB
+## X-Curse-Project-ID: TODO
+
+Libs\LibStub-1.0\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibRangeCheck-3.0\LibRangeCheck-3.0.lua
+MiniFramework.lua
+MiniHealerRange.lua
