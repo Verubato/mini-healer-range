@@ -3,9 +3,15 @@ local loader = CreateFrame("Frame")
 local loaded = false
 local onLoadCallbacks = {}
 local dropDownId = 1
+local sliderId = 1
+local dialog
 
 ---@class MiniFramework
-local M = {}
+local M = {
+	VerticalSpacing = 16,
+	HorizontalSpacing = 20,
+	TextMaxWidth = 600,
+}
 addon.Framework = M
 
 local function AddControlForRefresh(panel, control)
@@ -24,6 +30,83 @@ local function AddControlForRefresh(panel, control)
 			end
 		end
 	end
+end
+
+local function ConfigureNumbericBox(box, allowNegative)
+	if not allowNegative then
+		box:SetNumeric(true)
+		return
+	end
+
+	box:HookScript("OnTextChanged", function(boxSelf, userInput)
+		if not userInput then
+			return
+		end
+
+		local text = boxSelf:GetText()
+
+		-- allow: "", "-", "-123", "123"
+		if text == "" or text == "-" or text:match("^%-?%d+$") then
+			return
+		end
+
+		-- strip invalid chars
+		text = text:gsub("[^%d%-]", "")
+
+		-- only one leading '-'
+		text = text:gsub("%-+", "-")
+
+		if text:sub(1, 1) ~= "-" then
+			text = text:gsub("%-", "")
+		else
+			text = "-" .. text:sub(2):gsub("%-", "")
+		end
+
+		boxSelf:SetText(text)
+	end)
+end
+
+local function GetOrCreateDialog()
+	if dialog then
+		return dialog
+	end
+
+	dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+	dialog:SetSize(360, 140)
+	dialog:SetFrameStrata("DIALOG")
+	dialog:SetClampedToScreen(true)
+	dialog:SetMovable(true)
+	dialog:EnableMouse(true)
+	dialog:RegisterForDrag("LeftButton")
+	dialog:SetScript("OnDragStart", dialog.StartMoving)
+	dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
+	dialog:Hide()
+
+	dialog:SetBackdrop({
+		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		tile = true,
+		tileSize = 16,
+		edgeSize = 16,
+		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+	})
+	dialog:SetBackdropColor(0, 0, 0, 0.9)
+
+	dialog.Text = dialog:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
+	dialog.Text:SetPoint("TOPLEFT", 12, -12)
+	dialog.Text:SetPoint("TOPRIGHT", -12, -12)
+	dialog.Text:SetJustifyH("LEFT")
+	dialog.Text:SetJustifyV("TOP")
+
+	dialog.CloseButton = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+	dialog.CloseButton:SetSize(80, 22)
+	dialog.CloseButton:SetPoint("BOTTOM", 0, 12)
+	dialog.CloseButton:SetText(CLOSE)
+	dialog.CloseButton:SetScript("OnClick", function()
+		dialog:Hide()
+	end)
+
+	return dialog
 end
 
 function M:Notify(msg, ...)
@@ -71,6 +154,14 @@ function M:ClampInt(v, minV, maxV, fallback)
 	return v
 end
 
+function M:IsSecret(value)
+	if not issecretvalue then
+		return false
+	end
+
+	return issecretvalue(value)
+end
+
 function M:CanOpenOptionsDuringCombat()
 	if LE_EXPANSION_LEVEL_CURRENT == nil or LE_EXPANSION_MIDNIGHT == nil then
 		return true
@@ -79,7 +170,25 @@ function M:CanOpenOptionsDuringCombat()
 	return LE_EXPANSION_LEVEL_CURRENT < LE_EXPANSION_MIDNIGHT
 end
 
+function M:SettingsSize()
+	local settingsContainer = SettingsPanel and SettingsPanel.Container
+
+	if settingsContainer then
+		return settingsContainer:GetWidth(), settingsContainer:GetHeight()
+	end
+
+	if InterfaceOptionsFramePanelContainer then
+		return InterfaceOptionsFramePanelContainer:GetWidth(), InterfaceOptionsFramePanelContainer:GetHeight()
+	end
+
+	return 600, 600
+end
+
 function M:AddCategory(panel)
+	if not panel then
+		error("AddCategory - panel must not be nil.")
+	end
+
 	if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
 		local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
 		Settings.RegisterAddOnCategory(category)
@@ -94,7 +203,27 @@ function M:AddCategory(panel)
 	return nil
 end
 
+function M:AddSubCategory(parentCategory, panel)
+	if not parentCategory then
+		error("AddSubCategory - parentCategory must not be nil.")
+	end
+
+	if not panel then
+		error("AddSubCategory - panel must not be nil.")
+	end
+
+	if Settings and Settings.RegisterCanvasLayoutSubcategory then
+		Settings.RegisterCanvasLayoutSubcategory(parentCategory, panel, panel.name)
+	elseif InterfaceOptions_AddCategory then
+		InterfaceOptions_AddCategory(panel)
+	end
+end
+
 function M:WireTabNavigation(controls)
+	if not controls then
+		error("WireTabNavigation - controls must not be nil")
+	end
+
 	for i, control in ipairs(controls) do
 		control:EnableKeyboard(true)
 
@@ -131,53 +260,127 @@ function M:WireTabNavigation(controls)
 	end
 end
 
+---@param options TextLineOptions
+---@return table control
+function M:TextLine(options)
+	if not options then
+		error("TextLine - options must not be nil.")
+	end
+
+	if not options.Parent then
+		error("TextLine - invalid options.")
+	end
+
+	local fstring = options.Parent:CreateFontString(nil, "ARTWORK", options.Font or "GameFontWhite")
+	fstring:SetSpacing(0)
+	fstring:SetWidth(M.TextMaxWidth)
+	fstring:SetJustifyH("LEFT")
+	fstring:SetText(options.Text or "")
+
+	return fstring
+end
+
+---@param options TextBlockOptions
+---@return table container
+function M:TextBlock(options)
+	if not options then
+		error("TextBlock - options must not be nil.")
+	end
+
+	if not options.Parent or not options.Lines then
+		error("TextBlock - invalid options.")
+	end
+
+	local verticalSpacing = options.VerticalSpacing or M.VerticalSpacing
+	local container = CreateFrame("Frame", nil, options.Parent)
+	container:SetWidth(M.TextMaxWidth)
+
+	local anchor
+	local totalHeight = 0
+
+	for i, line in ipairs(options.Lines) do
+		local fstring = M:TextLine({
+			Text = line,
+			Parent = container,
+			Font = options.Font,
+		})
+
+		-- spacing between lines
+		local gap = (i == 1) and 0 or (verticalSpacing / 2)
+
+		if i == 1 then
+			fstring:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
+			totalHeight = totalHeight + fstring:GetStringHeight()
+		else
+			fstring:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
+			totalHeight = totalHeight + gap + fstring:GetStringHeight()
+		end
+
+		anchor = fstring
+	end
+
+	container:SetHeight(math.max(1, totalHeight))
+
+	return container
+end
+
+---Creates a horizontal line with a label.
+---@param options DividerOptions
+---@return table
+function M:Divider(options)
+	if not options then
+		error("Divider - options must not be nil.")
+	end
+
+	if not options.Parent then
+		error("Divider - invalid options.")
+	end
+
+	local container = CreateFrame("Frame", nil, options.Parent)
+	container:SetHeight(20)
+
+	local leftLine = container:CreateTexture(nil, "ARTWORK")
+	leftLine:SetColorTexture(1, 1, 1, 0.15)
+	leftLine:SetHeight(1)
+
+	local rightLine = container:CreateTexture(nil, "ARTWORK")
+	rightLine:SetColorTexture(1, 1, 1, 0.15)
+	rightLine:SetHeight(1)
+
+	local label = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	label:SetText(options.Text or "")
+	label:SetPoint("CENTER", container, "CENTER")
+
+	leftLine:SetPoint("LEFT", 0, 0)
+	leftLine:SetPoint("RIGHT", label, "LEFT", -8, 0)
+
+	rightLine:SetPoint("LEFT", label, "RIGHT", 8, 0)
+	rightLine:SetPoint("RIGHT", 0, 0)
+
+	return container
+end
+
 ---Creates an edit box with a label using the specified options.
 ---@param options EditboxOptions
----@return table label
----@return table checkbox
-function M:CreateEditBox(options)
+---@return EditBoxReturn
+function M:EditBox(options)
+	if not options then
+		error("EditBox - options must not be nil.")
+	end
+
 	if not options.Parent or not options.GetValue or not options.SetValue then
-		error("Invalid edit box options")
+		error("EditBox - invalid options.")
 	end
 
 	local label = options.Parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	label:SetText(options.LabelText or "")
 
 	local box = CreateFrame("EditBox", nil, options.Parent, "InputBoxTemplate")
-	box:SetSize(options.EditBoxWidth or 80, options.EditBoxHeight or 20)
+	box:SetSize(options.Width or 80, options.Height or 20)
 	box:SetAutoFocus(false)
 
-	if options.Numeric == true then
-		if options.AllowNegatives == true then
-			-- can't use SetNumeric(true) because it doesn't allow negatives
-			box:SetScript("OnTextChanged", function(boxSelf, userInput)
-				if not userInput then
-					return
-				end
-
-				local text = boxSelf:GetText()
-
-				-- allow: "", "-", "-123", "123"
-				if text == "" or text == "-" or text:match("^%-?%d+$") then
-					return
-				end
-
-				-- strip invalid chars
-				text = text:gsub("[^%d%-]", "")
-				-- only one leading '-'
-				text = text:gsub("%-+", "-")
-
-				if text:sub(1, 1) ~= "-" then
-					text = text:gsub("%-", "")
-				else
-					text = "-" .. text:sub(2):gsub("%-", "")
-				end
-
-				boxSelf:SetText(text)
-			end)
-		else
-			box:SetNumeric(true)
-		end
+	if options.Numeric then
+		ConfigureNumbericBox(box, options.AllowNegatives)
 	end
 
 	local function Commit()
@@ -208,7 +411,7 @@ function M:CreateEditBox(options)
 
 	AddControlForRefresh(options.Parent, box)
 
-	return label, box
+	return { EditBox = box, Label = label }
 end
 
 ---Creates a dropdown menu using the specified options.
@@ -216,8 +419,12 @@ end
 ---@return table the dropdown menu control
 ---@return boolean true if used a modern dropdown, otherwise false
 function M:Dropdown(options)
+	if not options then
+		error("Dropdown - options must not be nil.")
+	end
+
 	if not options.Parent or not options.GetValue or not options.SetValue or not options.Items then
-		error("Invalid dropdown options")
+		error("Dropdown - invalid options.")
 	end
 
 	if MenuUtil and MenuUtil.CreateRadioMenu then
@@ -339,26 +546,16 @@ function M:Dropdown(options)
 	error("Failed to create a dropdown control")
 end
 
-function M:SettingsSize()
-	local settingsContainer = SettingsPanel and SettingsPanel.Container
-
-	if settingsContainer then
-		return settingsContainer:GetWidth(), settingsContainer:GetHeight()
-	end
-
-	if InterfaceOptionsFramePanelContainer then
-		return InterfaceOptionsFramePanelContainer:GetWidth(), InterfaceOptionsFramePanelContainer:GetHeight()
-	end
-
-	return 600, 600
-end
-
 ---Creates a checkbox using the specified options.
 ---@param options CheckboxOptions
 ---@return table checkbox
-function M:CreateSettingCheckbox(options)
+function M:Checkbox(options)
+	if not options then
+		error("Checkbox - options must not be nil.")
+	end
+
 	if not options or not options.Parent or not options.GetValue or not options.SetValue then
-		error("Invalid checkbox settings")
+		error("Checkbox - invalid options.")
 	end
 
 	local checkbox = CreateFrame("CheckButton", nil, options.Parent, "UICheckButtonTemplate")
@@ -367,6 +564,9 @@ function M:CreateSettingCheckbox(options)
 	checkbox:SetChecked(options.GetValue())
 	checkbox:HookScript("OnClick", function()
 		options.SetValue(checkbox:GetChecked())
+
+		-- check the value changed at the source
+		checkbox:SetChecked(options.GetValue())
 	end)
 
 	if options.Tooltip then
@@ -391,20 +591,173 @@ function M:CreateSettingCheckbox(options)
 	return checkbox
 end
 
-function M:RegisterSlashCommand(category, panel)
+---Creates a slider using the specified options.
+---@param options SliderOptions
+---@return SliderReturn
+function M:Slider(options)
+	if not options then
+		error("Slider - options must not be nil.")
+	end
+
+	if
+		not options.Parent
+		or not options.GetValue
+		or not options.SetValue
+		or not options.Min
+		or not options.Max
+		or not options.Step
+	then
+		error("Slider - invalid options.")
+	end
+
+	local slider = CreateFrame("Slider", addonName .. "Slider" .. sliderId, options.Parent, "OptionsSliderTemplate")
+	sliderId = sliderId + 1
+
+	local label = slider:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	label:SetPoint("BOTTOMLEFT", slider, "TOPLEFT", 0, 8)
+	label:SetText(options.LabelText)
+
+	slider:SetOrientation("HORIZONTAL")
+	slider:SetMinMaxValues(options.Min, options.Max)
+	slider:SetValue(options.GetValue())
+	slider:SetValueStep(options.Step)
+	slider:SetObeyStepOnDrag(true)
+	slider:SetHeight(20)
+	slider:SetWidth(options.Width or 400)
+
+	local low = _G[slider:GetName() .. "Low"]
+	local high = _G[slider:GetName() .. "High"]
+
+	if low and high then
+		low:SetText(options.Min)
+		high:SetText(options.Max)
+	end
+
+	local box = CreateFrame("EditBox", nil, options.Parent, "InputBoxTemplate")
+	ConfigureNumbericBox(box, options.Min < 0)
+
+	box:SetPoint("CENTER", slider, "CENTER", 0, 30)
+	box:SetFontObject("GameFontWhite")
+	box:SetSize(50, 20)
+	box:SetAutoFocus(false)
+	box:SetMaxLetters(math.log(options.Max, 10) + 1)
+	box:SetText(tostring(options.GetValue()))
+	box:SetJustifyH("CENTER")
+	box:SetCursorPosition(0)
+
+	slider:SetScript("OnValueChanged", function(_, sliderValue, userInput)
+		if userInput ~= nil and not userInput then
+			return
+		end
+
+		box:SetText(tostring(sliderValue))
+
+		options.SetValue(sliderValue)
+	end)
+
+	box:SetScript("OnTextChanged", function(_, userInput)
+		if not userInput then
+			return
+		end
+
+		local value = tonumber(box:GetText())
+
+		-- don't clamp values here, because they might still be typing out a number
+		if not value then
+			return
+		end
+
+		slider:SetValue(value)
+		options.SetValue(value)
+	end)
+
+	function box.MiniRefresh(boxSelf)
+		local value = options.GetValue()
+		boxSelf:SetText(tostring(value))
+		boxSelf:SetCursorPosition(0)
+	end
+
+	function slider.MiniRefresh(sliderSelf)
+		local value = options.GetValue()
+		sliderSelf:SetValue(value)
+	end
+
+	AddControlForRefresh(options.Parent, slider)
+	AddControlForRefresh(options.Parent, box)
+
+	return { Slider = slider, EditBox = box, Label = label }
+end
+
+---@param options DialogOptions
+function M:ShowDialog(options)
+	if not options then
+		error("ShowDialog - options must not be nil.")
+	end
+
+	if not options.Text then
+		error("ShowDialog - invalid options.")
+	end
+
+	local dlg = GetOrCreateDialog()
+
+	if options.Width then
+		dlg:SetWidth(options.Width)
+	end
+
+	if options.Height then
+		dlg:SetHeight(options.Height)
+	end
+
+	dlg.Text:SetText(options.Text)
+
+	dlg:ClearAllPoints()
+	dlg:SetPoint("CENTER", UIParent, "CENTER")
+	dlg:Show()
+end
+
+function M:HideDialog()
+	if dialog then
+		dialog:Hide()
+	end
+end
+
+function M:RegisterSlashCommand(category, panel, commands)
+	if not category then
+		error("RegisterSlashCommand - category must not be nil.")
+	end
+	if not panel then
+		error("RegisterSlashCommand - panel must not be nil.")
+	end
+
 	local upper = string.upper(addonName)
 
 	SlashCmdList[upper] = function()
 		M:OpenSettings(category, panel)
 	end
+
+	if commands and #commands > 0 then
+		local addonUpper = string.upper(addonName)
+
+		for i, command in ipairs(commands) do
+			_G["SLASH_" .. addonUpper .. i] = command
+		end
+	end
 end
 
 function M:OpenSettings(category, panel)
+	if not category then
+		error("OpenSettings - category must not be nil.")
+	end
+
+	if not panel then
+		error("OpenSettings - panel must not be nil.")
+	end
+
 	if Settings and Settings.OpenToCategory then
-		if not InCombatLockdown() or CanOpenOptionsDuringCombat() then
+		if not InCombatLockdown() or M:CanOpenOptionsDuringCombat() then
 			Settings.OpenToCategory(category:GetID())
 		else
-			mini:NotifyCombatLockdown()
+			M:NotifyCombatLockdown()
 		end
 	elseif InterfaceOptionsFrame_OpenToCategory then
 		-- workaround the classic bug where the first call opens the Game interface
@@ -415,6 +768,10 @@ function M:OpenSettings(category, panel)
 end
 
 function M:WaitForAddonLoad(callback)
+	if not callback then
+		error("WaitForAddonLoad - callback must not be nil.")
+	end
+
 	onLoadCallbacks[#onLoadCallbacks + 1] = callback
 
 	if loaded then
@@ -452,6 +809,15 @@ function M:ResetSavedVars(defaults)
 	return vars
 end
 
+function M:ColumnWidth(columns, padding, spacingColumns)
+	local settingsWidth, _ = M:SettingsSize()
+	-- add padding to the left and right
+	local usableWidth = settingsWidth - (padding * 2)
+	local width = math.floor(usableWidth / (columns + spacingColumns))
+
+	return width
+end
+
 local function OnAddonLoaded(_, _, name)
 	if name ~= addonName then
 		return
@@ -481,10 +847,14 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field Tooltip string?
 ---@field Numeric boolean?
 ---@field AllowNegatives boolean?
----@field EditBoxWidth number?
----@field EditBoxHeight number?
+---@field Width number?
+---@field Height number?
 ---@field GetValue fun(): string|number
 ---@field SetValue fun(value: string|number)
+
+---@class EditBoxReturn
+---@field EditBox table
+---@field Label table
 
 ---@class DropdownOptions
 ---@field Parent table
@@ -493,3 +863,39 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field GetValue fun(): string
 ---@field SetValue fun(value: string)
 ---@field GetText? fun(value: any): string
+
+---@class SliderOptions
+---@field Parent table
+---@field LabelText string
+---@field Tooltip string?
+---@field Min number
+---@field Max number
+---@field Step number
+---@field Width number?
+---@field GetValue fun(): number
+---@field SetValue fun(value: number)
+
+---@class SliderReturn
+---@field Label table
+---@field EditBox table
+---@field Slider table
+
+---@class TextLineOptions
+---@field Text string
+---@field Parent table
+---@field Font string?
+
+---@class TextBlockOptions
+---@field Lines string[]
+---@field Parent table
+---@field Font string?
+---@field VerticalSpacing number?
+
+---@class DialogOptions
+---@field Text string
+---@field Width number?
+---@field Height number?
+
+---@class DividerOptions
+---@field Parent table
+---@field Text string

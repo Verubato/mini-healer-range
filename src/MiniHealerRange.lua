@@ -117,7 +117,7 @@ end
 local function Run()
 	if not IsInInstance() or IsHealer("player") then
 		StopTicker()
-		draggable:SetAlpha(0)
+		draggable:Hide()
 		return
 	end
 
@@ -125,12 +125,22 @@ local function Run()
 
 	if not healer then
 		StopTicker()
-		draggable:SetAlpha(0)
+		draggable:Hide()
 		return
 	end
 
 	local inRange = UnitInRange(healer)
-	draggable:SetAlphaFromBoolean(inRange, 0, 1)
+
+	if mini:IsSecret(inRange) then
+		draggable:SetAlphaFromBoolean(inRange, 0, 1)
+		draggable:Show()
+	else
+		if inRange then
+			draggable:Show()
+		else
+			draggable:Hide()
+		end
+	end
 end
 
 local function EnsureTicker()
@@ -162,8 +172,7 @@ local function OnAddonLoaded()
 	end
 
 	draggable:RegisterForDrag("LeftButton")
-	draggable:SetAlpha(0)
-	draggable:Show()
+	draggable:Hide()
 
 	draggable:SetScript("OnDragStart", function(self)
 		self:StartMoving()
