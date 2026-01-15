@@ -136,9 +136,9 @@ local function Run()
 		draggable:Show()
 	else
 		if inRange then
-			draggable:Show()
-		else
 			draggable:Hide()
+		else
+			draggable:Show()
 		end
 	end
 end
