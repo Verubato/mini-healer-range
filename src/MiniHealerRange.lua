@@ -8,27 +8,8 @@ local text
 local ticker
 ---@type Db
 local db
----@class Db
-local dbDefaults = {
-	Version = 1,
-	Point = "TOP",
-	RelativeTo = "UIParent",
-	RelativePoint = "TOP",
-	X = 0,
-	Y = -200,
-	Message = "No healer in range",
-	FontPath = "Fonts\\FRIZQT__.TTF",
-	FontSize = 24,
-	FontFlags = "OUTLINE",
-	FontColor = {
-		R = 1,
-		G = 0,
-		B = 0,
-		A = 1,
-	},
-	PaddingX = 10,
-	PaddingY = 10,
-}
+---@type Db
+local dbDefaults = addon.Config.DbDefaults
 
 local function ApplyPosition()
 	local point = db.Point or dbDefaults.Point
@@ -114,8 +95,30 @@ local function FindHealer()
 	return healer
 end
 
+local function ShouldRun()
+	if IsHealer("player") then
+		return false
+	end
+
+	local _, instanceType = IsInInstance()
+
+	if instanceType == "arena" then
+		return db.Enabled.Arena
+	end
+
+	if instanceType == "pvp" then
+		return db.Enabled.Battlegrounds
+	end
+
+    if instanceType == "party" or instanceType == "scenario" then
+		return db.Enabled.Dungeons
+	end
+
+	return false
+end
+
 local function Run()
-	if not IsInInstance() or IsHealer("player") then
+	if not ShouldRun() then
 		StopTicker()
 		draggable:Hide()
 		return
@@ -159,6 +162,8 @@ local function OnEvent()
 end
 
 local function OnAddonLoaded()
+	addon.Config:Init()
+
 	db = mini:GetSavedVars(dbDefaults)
 
 	draggable = CreateFrame("Frame", addonName .. "Frame", UIParent)
@@ -201,6 +206,10 @@ local function OnAddonLoaded()
 	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 
 	frame:SetScript("OnEvent", OnEvent)
+end
+
+function addon:Refresh()
+	Run()
 end
 
 mini:WaitForAddonLoad(OnAddonLoaded)

@@ -8,4 +8,5 @@
 ## X-Curse-Project-ID: 1429245
 
 MiniFramework.lua
+Config.lua
 MiniHealerRange.lua
