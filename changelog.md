@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- Smarter range detection.
+- Added config screen with some filter options.
+
 ## 1.0.3
 
 Logic bug fix for non-Midnight clients.
