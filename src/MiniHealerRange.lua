@@ -6,6 +6,7 @@ local updateInterval = 0.5
 local draggable
 local text
 local ticker
+local IsItemInRange = (C_Item and C_Item.IsItemInRange) or IsItemInRange
 ---@type Db
 local db
 ---@type Db
@@ -73,26 +74,50 @@ local function IsHealer(unit)
 	return UnitGroupRolesAssigned(unit) == "HEALER"
 end
 
-local function FindHealer()
+local function Within25Yards(unit)
+	if not IsItemInRange then
+		return false
+	end
+
+	-- egan's blaster
+	return IsItemInRange(13289, unit)
+end
+
+local function Within40Yards(unit)
+	if not IsItemInRange then
+		return false
+	end
+
+	-- check if we can throw a happy fun rock to them
+	return IsItemInRange(18640, unit)
+end
+
+local function FindClosestHealer()
 	local inRaid = IsInRaid()
 	local prefix = inRaid and "raid" or "party"
 	local count = inRaid and (MAX_RAID_MEMBERS or 40) or (MAX_PARTY_MEMBERS or 4)
 	local healer = nil
+	-- 25 yards for evokers
+	local healerWithin25Yards = nil
+	local healerWithin40Yards = nil
 
 	for i = 1, count do
 		local unit = prefix .. i
 
 		if IsHealer(unit) then
-			-- just return the first healer we find
-			-- we can't do any smarts with UnitInRange like determining if any single healer is in range
-			-- because we can't do logic conditions on secret booleans
-			-- so it's just luck of the draw whether we picked a healer in range or not
-			-- mostly people use this addon for 3v3, so there'll only ever be 1 healer
-			return unit
+			healer = unit
+
+			if Within40Yards(unit) then
+				healerWithin40Yards = unit
+
+				if Within25Yards(unit) then
+					healerWithin25Yards = unit
+				end
+			end
 		end
 	end
 
-	return healer
+	return healerWithin25Yards or healerWithin40Yards or healer
 end
 
 local function ShouldRun()
@@ -110,7 +135,7 @@ local function ShouldRun()
 		return db.Enabled.Battlegrounds
 	end
 
-    if instanceType == "party" or instanceType == "scenario" then
+	if instanceType == "party" or instanceType == "scenario" then
 		return db.Enabled.Dungeons
 	end
 
@@ -124,7 +149,7 @@ local function Run()
 		return
 	end
 
-	local healer = FindHealer()
+	local healer = FindClosestHealer()
 
 	if not healer then
 		StopTicker()
