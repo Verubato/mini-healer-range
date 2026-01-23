@@ -6,7 +6,7 @@ local updateInterval = 0.5
 local draggable
 local text
 local ticker
-local IsItemInRange = (C_Item and C_Item.IsItemInRange) or IsItemInRange
+local LRC = LibStub and LibStub("LibRangeCheck-3.0", true)
 ---@type Db
 local db
 ---@type Db
@@ -74,22 +74,23 @@ local function IsHealer(unit)
 	return UnitGroupRolesAssigned(unit) == "HEALER"
 end
 
-local function Within25Yards(unit)
-	if not IsItemInRange then
-		return false
+local function GetRangeMax(unit)
+	if LRC then
+		local _, maxRange = LRC:GetRange(unit)
+		return maxRange
 	end
 
-	-- egan's blaster
-	return IsItemInRange(13289, unit)
+	return nil
+end
+
+local function Within25Yards(unit)
+	local max = GetRangeMax(unit)
+	return max and max <= 25
 end
 
 local function Within40Yards(unit)
-	if not IsItemInRange then
-		return false
-	end
-
-	-- check if we can throw a happy fun rock to them
-	return IsItemInRange(18640, unit)
+	local max = GetRangeMax(unit)
+	return max and max <= 40
 end
 
 local function FindClosestHealer()
