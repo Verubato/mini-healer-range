@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+
+Fixed in-combat action blocked error.
+
 ## 1.1.0
 
 - Smarter range detection.
