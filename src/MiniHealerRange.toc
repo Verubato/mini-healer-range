@@ -2,7 +2,7 @@
 ## Title: MiniHealerRange
 ## Notes: Shows a warning message when out of range of your healer.
 ## Author: Verz
-## Version: 1.1.0
+## Version: 1.2.0
 ## IconTexture: Interface\AddOns\MiniHealerRange\Icon.blp
 ## SavedVariables: MiniHealerRangeDB
 ## X-Curse-Project-ID: 1429245
