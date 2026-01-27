@@ -1,6 +1,7 @@
 local addonName, addon = ...
 ---@type MiniFramework
 local mini = addon.Framework
+local horizontalSpacing = mini.HorizontalSpacing
 local verticalSpacing = mini.VerticalSpacing
 ---@class Db
 local db
@@ -108,22 +109,39 @@ function M:Init()
 
 	dungeonsChkBox:SetPoint("LEFT", bgChkBox, "LEFT", columnStep, 0)
 
+	local messageEditBox = mini:EditBox({
+		Parent = panel,
+		LabelText = "Message",
+		Width = columnStep * 2,
+		GetValue = function()
+			return db.Message
+		end,
+		SetValue = function(value)
+			db.Message = tostring(value)
+			addon:Refresh()
+		end,
+	})
+
+	messageEditBox.Label:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing)
+	messageEditBox.EditBox:SetPoint("LEFT", messageEditBox.Label, "RIGHT", horizontalSpacing, 0)
+
 	local textSizeSlider = mini:Slider({
 		Parent = panel,
 		LabelText = "Size",
 		Min = 10,
-		Max = 100,
+		-- it seems blizzard have a hard cap at 120
+		Max = 120,
 		Step = 1,
 		GetValue = function()
 			return db.FontSize
 		end,
 		SetValue = function(value)
-			db.FontSize = mini:ClampInt(value, 10, 100, dbDefaults.FontSize)
+			db.FontSize = mini:ClampInt(value, 10, 120, dbDefaults.FontSize)
 			addon:Refresh()
 		end,
 	})
 
-	textSizeSlider.Slider:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+	textSizeSlider.Slider:SetPoint("TOPLEFT", messageEditBox.Label, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	testBtn:SetSize(120, 26)
