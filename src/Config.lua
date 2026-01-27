@@ -72,7 +72,6 @@ function M:Init()
 		end,
 		SetValue = function(enabled)
 			db.Enabled.Arena = enabled
-
 			addon:Refresh()
 		end,
 	})
@@ -88,7 +87,6 @@ function M:Init()
 		end,
 		SetValue = function(enabled)
 			db.Enabled.Battlegrounds = enabled
-
 			addon:Refresh()
 		end,
 	})
@@ -104,12 +102,28 @@ function M:Init()
 		end,
 		SetValue = function(enabled)
 			db.Enabled.Dungeons = enabled
-
 			addon:Refresh()
 		end,
 	})
 
 	dungeonsChkBox:SetPoint("LEFT", bgChkBox, "LEFT", columnStep, 0)
+
+	local textSizeSlider = mini:Slider({
+		Parent = panel,
+		LabelText = "Size",
+		Min = 10,
+		Max = 100,
+		Step = 1,
+		GetValue = function()
+			return db.FontSize
+		end,
+		SetValue = function(value)
+			db.FontSize = mini:ClampInt(value, 10, 100, dbDefaults.FontSize)
+			addon:Refresh()
+		end,
+	})
+
+	textSizeSlider.Slider:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	testBtn:SetSize(120, 26)

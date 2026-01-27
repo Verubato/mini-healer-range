@@ -245,6 +245,8 @@ local function OnAddonLoaded()
 end
 
 function addon:Refresh()
+	ApplyFontStyle()
+	ResizeDraggableToText()
 	Run()
 end
 
