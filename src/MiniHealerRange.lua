@@ -48,7 +48,13 @@ local function ResizeDraggableToText()
 	draggable:SetSize(w + (db.PaddingX or 0) * 2, h + (db.PaddingY or 0) * 2)
 end
 
-local function ApplyFontStyle()
+local function UpdateText()
+	text:SetText(db.Message)
+
+	ResizeDraggableToText()
+end
+
+local function UpdateFontStyle()
 	text:SetFont(db.FontPath or "Fonts\\FRIZQT__.TTF", db.FontSize or 18, db.FontFlags or "OUTLINE")
 
 	local c = db.FontColor
@@ -190,10 +196,16 @@ local function EnsureTicker()
 	ticker = C_Timer.NewTicker(updateInterval, Run)
 end
 
-local function OnEvent()
+local function OnEvent(_, event)
+	if event == "PLAYER_REGEN_DISABLED" then
+		if testMode then
+			testMode = false
+			addon:Refresh()
+			return
+		end
+	end
+
 	EnsureTicker()
-	ApplyFontStyle()
-	ResizeDraggableToText()
 	Run()
 end
 
@@ -231,22 +243,20 @@ local function OnAddonLoaded()
 	text:Show()
 
 	-- must apply font before setting the text
-	ApplyFontStyle()
-
-	text:SetText(db.Message)
-
-	ResizeDraggableToText()
+	UpdateFontStyle()
+	UpdateText()
 
 	frame = CreateFrame("Frame")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 
 	frame:SetScript("OnEvent", OnEvent)
 end
 
 function addon:Refresh()
-	ApplyFontStyle()
-	ResizeDraggableToText()
+	UpdateFontStyle()
+	UpdateText()
 	Run()
 end
 
