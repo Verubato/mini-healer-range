@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- Added config options for message and text size.
+- Added test mode.
+
 ## 1.2.0
 
 Fixed in-combat action blocked error.
