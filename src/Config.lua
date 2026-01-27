@@ -111,6 +111,14 @@ function M:Init()
 
 	dungeonsChkBox:SetPoint("LEFT", bgChkBox, "LEFT", columnStep, 0)
 
+	local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+	testBtn:SetSize(120, 26)
+	testBtn:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, verticalSpacing)
+	testBtn:SetText("Test")
+	testBtn:SetScript("OnClick", function()
+		addon:ToggleTest()
+	end)
+
 	mini:RegisterSlashCommand(category, panel, {
 		"/minihr",
 		"/mhr",

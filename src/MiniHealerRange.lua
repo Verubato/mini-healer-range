@@ -1,6 +1,7 @@
 local addonName, addon = ...
 ---@type MiniFramework
 local mini = addon.Framework
+local testMode = false
 local frame
 local updateInterval = 0.5
 local draggable
@@ -122,6 +123,10 @@ local function FindClosestHealer()
 end
 
 local function ShouldRun()
+	if testMode then
+		return true
+	end
+
 	if IsHealer("player") then
 		return false
 	end
@@ -147,6 +152,11 @@ local function Run()
 	if not ShouldRun() then
 		StopTicker()
 		draggable:Hide()
+		return
+	end
+
+	if testMode then
+		draggable:Show()
 		return
 	end
 
@@ -236,6 +246,11 @@ end
 
 function addon:Refresh()
 	Run()
+end
+
+function addon:ToggleTest()
+	testMode = not testMode
+	addon:Refresh()
 end
 
 mini:WaitForAddonLoad(OnAddonLoaded)
