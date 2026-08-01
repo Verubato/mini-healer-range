@@ -13,27 +13,6 @@ local db
 ---@type Db
 local dbDefaults = addon.Config.DbDefaults
 
-local function ApplyPosition()
-	local point = db.Point or dbDefaults.Point
-	local relativePoint = db.RelativePoint or dbDefaults.RelativePoint
-	local relativeTo = (db.RelativeTo and _G[db.RelativeTo]) or UIParent
-	local x = (type(db.X) == "number") and db.X or dbDefaults.X
-	local y = (type(db.Y) == "number") and db.Y or dbDefaults.Y
-
-	draggable:ClearAllPoints()
-	draggable:SetPoint(point, relativeTo, relativePoint, x, y)
-end
-
-local function SavePosition()
-	local point, relativeTo, relativePoint, x, y = draggable:GetPoint(1)
-
-	db.Point = point
-	db.RelativeTo = relativeTo
-	db.RelativePoint = relativePoint
-	db.X = x
-	db.Y = y
-end
-
 local function ResizeDraggableToText()
 	local w = text:GetStringWidth() or 0
 	local h = text:GetStringHeight() or 0
@@ -215,28 +194,10 @@ local function OnAddonLoaded()
 	db = mini:GetSavedVars(dbDefaults)
 
 	draggable = CreateFrame("Frame", addonName .. "Frame", UIParent)
-	draggable:SetClampedToScreen(true)
-	draggable:EnableMouse(true)
-	draggable:SetMovable(true)
-
-	-- let us control the position via saved vars
-	if draggable.SetDontSavePosition then
-		draggable:SetDontSavePosition(true)
-	end
-
-	draggable:RegisterForDrag("LeftButton")
 	draggable:Hide()
 
-	draggable:SetScript("OnDragStart", function(self)
-		self:StartMoving()
-	end)
-
-	draggable:SetScript("OnDragStop", function(self)
-		self:StopMovingOrSizing()
-		SavePosition()
-	end)
-
-	ApplyPosition()
+	mini:MakeMovable(draggable, db)
+	mini:ApplyPosition(draggable, db, dbDefaults)
 
 	text = draggable:CreateFontString(nil, "OVERLAY")
 	text:SetPoint("CENTER", draggable, "CENTER", 0, 0)

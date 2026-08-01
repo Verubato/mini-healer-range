@@ -52,17 +52,10 @@ function M:Init()
 
 	local columns = 4
 	local columnStep = mini:ColumnWidth(columns, 0, 0)
-	local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
-	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	title:SetPoint("TOPLEFT", 0, -verticalSpacing)
-	title:SetText(string.format("%s - %s", addonName, version))
-
-	local description = mini:TextLine({
+	local header = mini:PanelHeader({
 		Parent = panel,
-		Text = "Increase your awareness.",
+		Description = "Increase your awareness.",
 	})
-
-	description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 
 	local arenaChkBox = mini:Checkbox({
 		Parent = panel,
@@ -77,7 +70,7 @@ function M:Init()
 		end,
 	})
 
-	arenaChkBox:SetPoint("TOPLEFT", description, "BOTTOMLEFT", -4, -verticalSpacing)
+	arenaChkBox:SetPoint("TOPLEFT", header.Anchor, "BOTTOMLEFT", -4, -verticalSpacing)
 
 	local bgChkBox = mini:Checkbox({
 		Parent = panel,
