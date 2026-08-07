@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+
+- Added a Lock option to prevent accidentally dragging the frame.
+- Added font, outline and colour options, with LibSharedMedia font support.
+
 ## 1.4.2
 
 Updated interface versions for the latest client builds.
