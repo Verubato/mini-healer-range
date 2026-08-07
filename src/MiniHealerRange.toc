@@ -9,6 +9,7 @@
 
 Libs\LibStub-1.0\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Libs\LibRangeCheck-3.0\LibRangeCheck-3.0.lua
 Libs\MiniFramework\MiniFramework.xml
 Config.lua
