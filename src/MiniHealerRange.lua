@@ -196,7 +196,11 @@ local function OnAddonLoaded()
 	draggable = CreateFrame("Frame", addonName .. "Frame", UIParent)
 	draggable:Hide()
 
-	mini:MakeMovable(draggable, db)
+	mini:MakeMovable(draggable, db, {
+		IsLocked = function()
+			return db.Locked
+		end,
+	})
 	mini:ApplyPosition(draggable, db, dbDefaults)
 
 	text = draggable:CreateFontString(nil, "OVERLAY")
@@ -218,6 +222,7 @@ end
 function addon:Refresh()
 	UpdateFontStyle()
 	UpdateText()
+	mini:SetPositionLocked(draggable, db.Locked)
 	Run()
 end
 

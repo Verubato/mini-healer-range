@@ -25,6 +25,7 @@ local dbDefaults = {
 	},
 	PaddingX = 10,
 	PaddingY = 10,
+	Locked = false,
 
 	Enabled = {
 		Arena = true,
@@ -101,6 +102,21 @@ function M:Init()
 	})
 
 	dungeonsChkBox:SetPoint("LEFT", bgChkBox, "LEFT", columnStep, 0)
+
+	local lockChkBox = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Lock",
+		Tooltip = "Prevents the frame from being dragged.",
+		GetValue = function()
+			return db.Locked
+		end,
+		SetValue = function(enabled)
+			db.Locked = enabled
+			addon:Refresh()
+		end,
+	})
+
+	lockChkBox:SetPoint("LEFT", dungeonsChkBox, "LEFT", columnStep, 0)
 
 	local messageEditBox = mini:EditBox({
 		Parent = panel,
