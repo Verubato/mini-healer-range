@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+Updated the addon icon to the new shared Mini style.
+
 ## 1.5.0
 
 - Added a Lock option to prevent accidentally dragging the frame.
