@@ -12,9 +12,9 @@ Feedback and feature requests are more than welcome!
 
 ## Screenshots
 
-![MiniHealerRange screenshot](https://media.forgecdn.net/attachments/1480/170/screenshot-settings-png.png)
+![MiniHealerRange screenshot](https://raw.githubusercontent.com/Verubato/mini-healer-range/main/assets/ScreenshotSettings.png)
 
-![MiniHealerRange screenshot](https://media.forgecdn.net/attachments/1466/216/screenshot-png.png)
+![MiniHealerRange screenshot](https://raw.githubusercontent.com/Verubato/mini-healer-range/main/assets/Screenshot.png)
 
 ## Download
 
