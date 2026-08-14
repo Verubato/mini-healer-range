@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+Dropped old retail clients support.
+
 ## 1.5.1
 
 Updated the addon icon to the new shared Mini style.
