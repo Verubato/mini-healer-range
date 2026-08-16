@@ -1,6 +1,7 @@
 ## Interface: 120100, 50504, 40402, 38002, 38000, 30405, 20506, 11509
 ## Title: MiniHealerRange
 ## Notes: Shows a warning message when out of range of your healer.
+## Category: Mini
 ## Author: Verz
 ## Version: 1.5.2
 ## IconTexture: Interface\AddOns\MiniHealerRange\Icon.blp
