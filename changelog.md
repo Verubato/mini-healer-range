@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4
+
+Reduced CPU use: each healer's range is checked once per update instead of twice, and only the real group size is scanned.
+
 ## 1.5.3
 
 Added a Mini category so the addon groups with the other Mini addons in the addon list.
