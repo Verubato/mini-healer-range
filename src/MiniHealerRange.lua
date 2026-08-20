@@ -4,6 +4,9 @@ local mini = addon.Framework
 local testMode = false
 local frame
 local updateInterval = 0.5
+-- Group unit tokens by prefix and index, built as they are first asked for. The ticker walks
+-- the group twice a second and the tokens never change.
+local unitTokens = { raid = {}, party = {} }
 local draggable
 local text
 local ticker
@@ -69,35 +72,44 @@ local function GetRangeMax(unit)
 	return nil
 end
 
-local function Within25Yards(unit)
-	local max = GetRangeMax(unit)
-	return max and max <= 25
-end
+local function UnitToken(prefix, index)
+	local byIndex = unitTokens[prefix]
+	local token = byIndex[index]
 
-local function Within40Yards(unit)
-	local max = GetRangeMax(unit)
-	return max and max <= 40
+	if not token then
+		token = prefix .. index
+		byIndex[index] = token
+	end
+
+	return token
 end
 
 local function FindClosestHealer()
 	local inRaid = IsInRaid()
 	local prefix = inRaid and "raid" or "party"
-	local count = inRaid and (MAX_RAID_MEMBERS or 40) or (MAX_PARTY_MEMBERS or 4)
+	local members = GetNumGroupMembers() or 0
+	-- Only the members actually in the group, rather than every token the game could name.
+	-- Raid tokens cover the whole group; party tokens are everyone but the player.
+	local count = inRaid and members or (members > 0 and members - 1 or 0)
 	local healer = nil
 	-- 25 yards for evokers
 	local healerWithin25Yards = nil
 	local healerWithin40Yards = nil
 
 	for i = 1, count do
-		local unit = prefix .. i
+		local unit = UnitToken(prefix, i)
 
 		if IsHealer(unit) then
 			healer = unit
 
-			if Within40Yards(unit) then
+			-- One range check answers both bands. LibRangeCheck walks a list of spells and
+			-- items per call, and this runs twice a second.
+			local max = GetRangeMax(unit)
+
+			if max and max <= 40 then
 				healerWithin40Yards = unit
 
-				if Within25Yards(unit) then
+				if max <= 25 then
 					healerWithin25Yards = unit
 				end
 			end
