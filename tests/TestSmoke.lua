@@ -32,11 +32,33 @@ local function FindButton(label)
 	return nil
 end
 
+---The size slider was moved below the font row, so a test follows its own anchor rather than
+---reading the layout code back.
+---@return boolean
+local function SliderFollowsFontRow()
+	local slider
+
+	for _, frame in ipairs(WowMock.Frames) do
+		if frame:GetObjectType() == "Slider" then
+			slider = frame
+		end
+	end
+
+	if not slider then
+		return false
+	end
+
+	local _, relativeTo = slider:GetPoint()
+
+	return relativeTo ~= nil and relativeTo.GetText and relativeTo:GetText() == "Font"
+end
+
 smoke.Run("MiniHealerRange", {
 	extra = function(context)
 		fw.eq(context.Addon.Framework.CustomStyling, true, "custom styling on")
 		fw.eq(context.Addon.Framework.CustomStylingOverrides.Button, false, "stock buttons")
 		fw.truthy(HasDivider("SETTINGS"), "the settings section rule under the header")
+		fw.truthy(SliderFollowsFontRow(), "the font size slider sits below the font row")
 
 		local db = _G["MiniHealerRangeDB"]
 		db.FontSize = 99

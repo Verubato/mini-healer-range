@@ -197,24 +197,6 @@ function M:Init()
 	messageEditBox.Label:SetPoint("TOPLEFT", appearanceDivider, "BOTTOMLEFT", 0, -verticalSpacing)
 	messageEditBox.EditBox:SetPoint("LEFT", messageEditBox.Label, "RIGHT", horizontalSpacing, 0)
 
-	local textSizeSlider = mini:Slider({
-		Parent = panel,
-		LabelText = "Size",
-		Min = 10,
-		-- it seems blizzard have a hard cap at 120
-		Max = 120,
-		Step = 1,
-		GetValue = function()
-			return db.FontSize
-		end,
-		SetValue = function(value)
-			db.FontSize = mini:ClampInt(value, 10, 120, dbDefaults.FontSize)
-			addon:Refresh()
-		end,
-	})
-
-	textSizeSlider.Slider:SetPoint("TOPLEFT", messageEditBox.Label, "BOTTOMLEFT", 0, -verticalSpacing * 3)
-
 	local fontItems, fontNames = GetFontLists()
 
 	local fontDdl = mini:Dropdown({
@@ -234,7 +216,7 @@ function M:Init()
 		end,
 	})
 
-	fontDdl.Label:SetPoint("TOPLEFT", textSizeSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 2)
+	fontDdl.Label:SetPoint("TOPLEFT", messageEditBox.Label, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local outlineDdl = mini:Dropdown({
 		Parent = panel,
@@ -273,6 +255,24 @@ function M:Init()
 	})
 
 	colourSwatch:SetPoint("LEFT", outlineDdl, "RIGHT", horizontalSpacing * 2, 0)
+
+	local textSizeSlider = mini:Slider({
+		Parent = panel,
+		LabelText = "Size",
+		Min = 10,
+		-- it seems blizzard have a hard cap at 120
+		Max = 120,
+		Step = 1,
+		GetValue = function()
+			return db.FontSize
+		end,
+		SetValue = function(value)
+			db.FontSize = mini:ClampInt(value, 10, 120, dbDefaults.FontSize)
+			addon:Refresh()
+		end,
+	})
+
+	textSizeSlider.Slider:SetPoint("TOPLEFT", fontDdl.Label, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local testBtn = mini:Button({
 		Parent = panel,
