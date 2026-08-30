@@ -46,7 +46,10 @@ healer, and it does not run in the open world or in raid instances.
 
 ## Settings
 
-Single options panel. Panel description reads "Increase your awareness."
+Single options panel. Panel description reads "Increase your awareness." Its
+header carries a **Test** button, which toggles test mode, beside a **Reset to
+Defaults** button, which resets every setting after a Yes/No confirmation and
+also moves the warning text back to its default screen position.
 
 | Setting | Type | Default | Range / options | Notes |
 | --- | --- | --- | --- | --- |
@@ -55,13 +58,10 @@ Single options panel. Panel description reads "Increase your awareness."
 | Dungeons | checkbox | on | - | Enable in dungeons and scenarios. |
 | Lock | checkbox | off | - | Prevents the frame from being dragged. |
 | Message | edit box | "No healer in range" | - | The warning text. |
-| Size | slider | 24 | 10-120 | Font size (Blizzard caps fonts at 120). |
-| Font | dropdown | Friz Quadrata | LibSharedMedia fonts; falls back to 5 built-ins (Friz Quadrata, Arial Narrow, Morpheus, Skurri, Myriad Pro) | |
+| Font | dropdown | Friz Quadrata | LibSharedMedia fonts; falls back to 5 built-ins (Friz Quadrata, Arial Narrow, Morpheus, Skurri, Myriad Pro); each row previews in its own font | |
 | Outline | dropdown | Outline | Outline, Thick Outline, Monochrome, None | |
 | Colour | color swatch | red (1, 0, 0, 1) | any color + alpha | |
-| Test | button | - | - | Toggles test mode on/off. |
-
-There is no reset-to-defaults button; settings live in MiniHealerRangeDB.
+| Size | slider | 24 | 10-120 | Font size (Blizzard caps fonts at 120). |
 
 ## Version-gated behavior
 

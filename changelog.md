@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.5
+
+- UI improvements.
+- Fixed the display ignoring the selected font.
+- Fixed reset not moving the display back.
+- Added font previews to the font dropdown.
+
 ## 1.5.4
 
 Reduced CPU use: each healer's range is checked once per update instead of twice, and only the real group size is scanned.
