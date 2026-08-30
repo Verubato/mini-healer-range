@@ -391,5 +391,62 @@ smoke.Run("MiniHealerRange", {
 		fw.has_key(overridden, "MiniHealerRange Overridden Face", "the face registered under the override lands too")
 
 		lsm:SetGlobal("font", nil)
+
+		local displayFrame = _G["MiniHealerRangeFrame"]
+		fw.not_nil(displayFrame, "the display frame exists")
+
+		local displayText
+		for _, region in ipairs({ displayFrame:GetRegions() }) do
+			if region:GetObjectType() == "FontString" then
+				displayText = region
+				break
+			end
+		end
+		fw.not_nil(displayText, "the display frame has a fontstring")
+
+		local displayObject = displayText:GetFontObject()
+		fw.not_nil(displayObject, "the display text holds a font object rather than a raw SetFont")
+
+		fw.eq(
+			displayObject.__members and #displayObject.__members or 0,
+			5,
+			"the display font is a family declaring all five alphabets"
+		)
+
+		local Fonts = context.Addon.Fonts
+		fw.not_nil(Fonts, "the addon exposes its Fonts module")
+
+		local firstFile = "Fonts\\FRIZQT__.TTF"
+		local first = Fonts:FileFontObject(firstFile, 18, "OUTLINE")
+		local second = Fonts:FileFontObject(firstFile, 18, "OUTLINE")
+		local third = Fonts:FileFontObject(firstFile, 22, "OUTLINE")
+		local fourth = Fonts:FileFontObject(firstFile, 18, "")
+
+		fw.truthy(first == second, "the same file, size and flags return the same cached object")
+		fw.truthy(first ~= third, "a different size returns a different object")
+		fw.truthy(first ~= fourth, "a different flags value returns a different object")
+
+		local originalGetFontObjectForAlphabet = GameFontNormal.GetFontObjectForAlphabet
+
+		GameFontNormal.GetFontObjectForAlphabet = function(_, alphabet)
+			return { GetFont = function() return "Fonts\\" .. alphabet .. ".ttf" end }
+		end
+
+		local customFile = "Fonts\\MiniHealerRangeCustomFace.ttf"
+		local substituted = Fonts:FileFontObject(customFile, 18, "OUTLINE")
+		local ownAlphabetFile, otherAlphabetFile
+
+		for _, member in ipairs(substituted.__members) do
+			if member.alphabet == "roman" then
+				ownAlphabetFile = member.file
+			elseif member.alphabet == "korean" then
+				otherAlphabetFile = member.file
+			end
+		end
+
+		GameFontNormal.GetFontObjectForAlphabet = originalGetFontObjectForAlphabet
+
+		fw.eq(ownAlphabetFile, customFile, "the client's own alphabet keeps the requested face")
+		fw.eq(otherAlphabetFile, "Fonts\\korean.ttf", "another alphabet borrows the client's own file for it")
 	end,
 })

@@ -37,7 +37,13 @@ local function UpdateText()
 end
 
 local function UpdateFontStyle()
-	text:SetFont(db.FontPath or "Fonts\\FRIZQT__.TTF", db.FontSize or 18, db.FontFlags or "OUTLINE")
+	local object = addon.Fonts:FileFontObject(db.FontPath or "Fonts\\FRIZQT__.TTF", db.FontSize or 18, db.FontFlags or "OUTLINE")
+	local message = text:GetText()
+
+	text:SetFontObject(object)
+	-- Attaching a new object doesn't repaint text already drawn.
+	text:SetText("")
+	text:SetText(message)
 
 	local c = db.FontColor
 	local r, g, b, a = 1, 1, 1, 1

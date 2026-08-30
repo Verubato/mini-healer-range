@@ -29,15 +29,6 @@ local LEGACY_DROPDOWN_INSET = 16
 -- The flattened field's border draws outside the box's own frame on both sides.
 local FIELD_BORDER_LEFT = 6
 local FIELD_BORDER_RIGHT = 2
--- Only the client's own locale takes the previewed file, so text in another script still
--- renders from the game's own files.
-local FAMILY_ALPHABETS = { "roman", "korean", "simplifiedchinese", "traditionalchinese", "russian" }
-local LOCALE_ALPHABETS = {
-	koKR = "korean",
-	zhCN = "simplifiedchinese",
-	zhTW = "traditionalchinese",
-	ruRU = "russian",
-}
 -- The preview rows are menu rows, so their text matches the menu's own size.
 local PREVIEW_FONT_SIZE = 13
 ---@class Db
@@ -76,10 +67,6 @@ local fontNames = {}
 local fontsDropdown
 local fontsMediaSubscribed = false
 local fontsRefreshQueued = false
--- Cached per file, since CreateFontFamily needs a unique name per object and dropdown rows ask
--- for the same handful of files over and over.
-local previewFontObjects = {}
-local previewFontObjectCount = 0
 ---@class Config
 local M = {
 	DbDefaults = dbDefaults,
@@ -157,55 +144,6 @@ local function EnsureFontMediaSubscription()
 	lsm.RegisterCallback(M, "LibSharedMedia_Registered", QueueFontListsChanged)
 end
 
----One member per alphabet the client distinguishes.
----@param file string
----@return table[] members
-local function FamilyMembers(file)
-	local override = LOCALE_ALPHABETS[GetLocale()] or "roman"
-	local members = {}
-
-	for _, alphabet in ipairs(FAMILY_ALPHABETS) do
-		local memberFile = file
-
-		if alphabet ~= override and GameFontNormal and GameFontNormal.GetFontObjectForAlphabet then
-			local gameObject = GameFontNormal:GetFontObjectForAlphabet(alphabet)
-
-			memberFile = (gameObject and gameObject:GetFont()) or file
-		end
-
-		members[#members + 1] = {
-			alphabet = alphabet,
-			file = memberFile,
-			height = PREVIEW_FONT_SIZE,
-			flags = "",
-		}
-	end
-
-	return members
-end
-
----A font object wearing this file's own face, for a dropdown row that previews the font it names.
----SetFont answers false for a file the client is still loading, leaving the object undefined for
----good.
----@param file string
----@return table? object
-local function PreviewFontObject(file)
-	if not CreateFontFamily then
-		return nil
-	end
-
-	local object = previewFontObjects[file]
-
-	if not object then
-		previewFontObjectCount = previewFontObjectCount + 1
-
-		object = CreateFontFamily(addonName .. "FontPreview" .. previewFontObjectCount, FamilyMembers(file))
-		previewFontObjects[file] = object
-	end
-
-	return object
-end
-
 ---Previews the font each dropdown row names. Menu rows are pooled and reused across openings.
 ---@param button table
 ---@param file string
@@ -220,7 +158,7 @@ local function DecorateFontRow(button, file)
 		button.MiniHealerRangeStockFont = text:GetFontObject() or false
 	end
 
-	local preview = PreviewFontObject(file)
+	local preview = addon.Fonts:FileFontObject(file, PREVIEW_FONT_SIZE, "")
 
 	if preview then
 		text:SetFontObject(preview)
