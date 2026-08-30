@@ -85,6 +85,9 @@ local function GetFontLists()
 end
 
 function M:Init()
+	-- A styled button clashes with the stock Blizzard art around it in the settings screen.
+	mini:SetCustomStyling(true, { Button = false })
+
 	db = mini:GetSavedVars(dbDefaults)
 
 	local panel = CreateFrame("Frame")
@@ -163,6 +166,14 @@ function M:Init()
 
 	lockChkBox:SetPoint("LEFT", dungeonsChkBox, "LEFT", columnStep, 0)
 
+	local appearanceDivider = mini:Divider({
+		Parent = panel,
+		Text = "Appearance",
+	})
+
+	appearanceDivider:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing * 2)
+	appearanceDivider:SetPoint("RIGHT", panel, "RIGHT", 0, 0)
+
 	local messageEditBox = mini:EditBox({
 		Parent = panel,
 		LabelText = "Message",
@@ -176,7 +187,7 @@ function M:Init()
 		end,
 	})
 
-	messageEditBox.Label:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing)
+	messageEditBox.Label:SetPoint("TOPLEFT", appearanceDivider, "BOTTOMLEFT", 0, -verticalSpacing)
 	messageEditBox.EditBox:SetPoint("LEFT", messageEditBox.Label, "RIGHT", horizontalSpacing, 0)
 
 	local textSizeSlider = mini:Slider({
@@ -256,13 +267,17 @@ function M:Init()
 
 	colourSwatch:SetPoint("LEFT", outlineDdl, "RIGHT", horizontalSpacing * 2, 0)
 
-	local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-	testBtn:SetSize(120, 26)
+	local testBtn = mini:Button({
+		Parent = panel,
+		Text = "Test",
+		Width = 120,
+		Height = 26,
+		OnClick = function()
+			addon:ToggleTest()
+		end,
+	})
+
 	testBtn:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, verticalSpacing)
-	testBtn:SetText("Test")
-	testBtn:SetScript("OnClick", function()
-		addon:ToggleTest()
-	end)
 
 	mini:RegisterSlashCommand(category, panel, {
 		"/minihr",
