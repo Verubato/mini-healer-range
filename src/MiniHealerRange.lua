@@ -240,6 +240,8 @@ end
 function addon:Refresh()
 	UpdateFontStyle()
 	UpdateText()
+	-- The reset restores the default anchor, and nothing else re-applies it.
+	mini:ApplyPosition(draggable, db, dbDefaults)
 	mini:SetPositionLocked(draggable, db.Locked)
 	Run()
 end

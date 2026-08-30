@@ -318,6 +318,30 @@ smoke.Run("MiniHealerRange", {
 		fw.eq(db.FontSize, context.Addon.Config.DbDefaults.FontSize, "reset restored FontSize")
 		fw.eq(db.Enabled.Arena, context.Addon.Config.DbDefaults.Enabled.Arena, "reset restored Enabled.Arena")
 
+		local displayFrame = _G["MiniHealerRangeFrame"]
+		local defaults = context.Addon.Config.DbDefaults
+
+		fw.not_nil(displayFrame, "the display frame exists")
+
+		displayFrame:ClearAllPoints()
+		displayFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 350, -75)
+		db.Point = "TOPLEFT"
+		db.RelativePoint = "TOPLEFT"
+		db.RelativeTo = "UIParent"
+		db.X = 350
+		db.Y = -75
+
+		AcceptConfirm(function()
+			resetBtn:Click()
+		end)
+
+		local point, _, relativePoint, x, y = displayFrame:GetPoint(1)
+
+		fw.eq(x, defaults.X, "reset put the display back at its default x")
+		fw.eq(y, defaults.Y, "reset put the display back at its default y")
+		fw.eq(point, defaults.Point, "reset put the display back on its default anchor point")
+		fw.eq(relativePoint, defaults.RelativePoint, "reset put the display back on its default relative point")
+
 		local fontDdl = FindControlFor("Font")
 		local newFontName = "MiniHealerRange Test Face"
 
@@ -391,9 +415,6 @@ smoke.Run("MiniHealerRange", {
 		fw.has_key(overridden, "MiniHealerRange Overridden Face", "the face registered under the override lands too")
 
 		lsm:SetGlobal("font", nil)
-
-		local displayFrame = _G["MiniHealerRangeFrame"]
-		fw.not_nil(displayFrame, "the display frame exists")
 
 		local displayText
 		for _, region in ipairs({ displayFrame:GetRegions() }) do
