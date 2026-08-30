@@ -24,6 +24,10 @@ local fontFlagNames = {
 	MONOCHROME = "Monochrome",
 	[""] = "None",
 }
+-- The slider's value chip floats above its top edge, outside the frame's own rect.
+local SLIDER_CHIP_OVERHANG = 30
+-- The slider's range labels hang below its bottom edge, outside the frame's own rect.
+local SLIDER_RANGE_OVERHANG = 12
 ---@class Db
 local db
 ---@class Db
@@ -126,7 +130,7 @@ function M:Init()
 		end,
 	})
 
-	arenaChkBox:SetPoint("TOPLEFT", header.Anchor, "BOTTOMLEFT", -4, -verticalSpacing)
+	arenaChkBox:SetPoint("TOPLEFT", header.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local bgChkBox = mini:Checkbox({
 		Parent = panel,
@@ -181,10 +185,21 @@ function M:Init()
 	appearanceDivider:SetPoint("TOPLEFT", arenaChkBox, "BOTTOMLEFT", 0, -verticalSpacing * 2)
 	appearanceDivider:SetPoint("RIGHT", panel, "RIGHT", 0, 0)
 
+	-- Every entry spends this budget, so their right edges line up down the section.
+	local entryWidth = columnStep * 2
+
+	---Starts an entry on the section's left edge, clear of whatever control sits above it.
+	---@param region table
+	---@param above table
+	---@param gap number
+	local function StackEntry(region, above, gap)
+		region:SetPoint("TOP", above, "BOTTOM", 0, -gap)
+		region:SetPoint("LEFT", appearanceDivider, "LEFT", 0, 0)
+	end
+
 	local messageEditBox = mini:EditBox({
 		Parent = panel,
 		LabelText = "Message",
-		Width = columnStep * 2,
 		GetValue = function()
 			return db.Message
 		end,
@@ -194,8 +209,10 @@ function M:Init()
 		end,
 	})
 
-	messageEditBox.Label:SetPoint("TOPLEFT", appearanceDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	StackEntry(messageEditBox.Label, appearanceDivider, verticalSpacing)
 	messageEditBox.EditBox:SetPoint("LEFT", messageEditBox.Label, "RIGHT", horizontalSpacing, 0)
+	-- The label is only measurable once the widget has built it.
+	messageEditBox.EditBox:SetWidth(math.max(1, entryWidth - horizontalSpacing - messageEditBox.Label:GetStringWidth()))
 
 	local fontItems, fontNames = GetFontLists()
 
@@ -203,7 +220,7 @@ function M:Init()
 		Parent = panel,
 		LabelText = "Font",
 		Items = fontItems,
-		Width = columnStep * 2,
+		Width = entryWidth,
 		GetValue = function()
 			return db.FontPath
 		end,
@@ -216,13 +233,15 @@ function M:Init()
 		end,
 	})
 
-	fontDdl.Label:SetPoint("TOPLEFT", messageEditBox.Label, "BOTTOMLEFT", 0, -verticalSpacing)
+	-- A dropdown is taller than its label and sits centred on it, so the next entry clears
+	-- the control rather than the label.
+	StackEntry(fontDdl.Label, messageEditBox.EditBox, verticalSpacing)
 
 	local outlineDdl = mini:Dropdown({
 		Parent = panel,
 		LabelText = "Outline",
 		Items = fontFlagItems,
-		Width = columnStep,
+		Width = entryWidth,
 		GetValue = function()
 			return db.FontFlags
 		end,
@@ -235,7 +254,7 @@ function M:Init()
 		end,
 	})
 
-	outlineDdl.Label:SetPoint("LEFT", fontDdl, "RIGHT", horizontalSpacing * 2, 0)
+	StackEntry(outlineDdl.Label, fontDdl, verticalSpacing)
 
 	local colourSwatch = mini:ColorSwatch({
 		Parent = panel,
@@ -254,7 +273,11 @@ function M:Init()
 		end,
 	})
 
-	colourSwatch:SetPoint("LEFT", outlineDdl, "RIGHT", horizontalSpacing * 2, 0)
+	-- The swatch builds its label on the right, flipped here so every entry in the section
+	-- reads label first.
+	colourSwatch.Label:ClearAllPoints()
+	StackEntry(colourSwatch.Label, outlineDdl, verticalSpacing)
+	colourSwatch:SetPoint("LEFT", colourSwatch.Label, "RIGHT", horizontalSpacing, 0)
 
 	local textSizeSlider = mini:Slider({
 		Parent = panel,
@@ -263,6 +286,7 @@ function M:Init()
 		-- it seems blizzard have a hard cap at 120
 		Max = 120,
 		Step = 1,
+		Width = entryWidth,
 		GetValue = function()
 			return db.FontSize
 		end,
@@ -272,7 +296,7 @@ function M:Init()
 		end,
 	})
 
-	textSizeSlider.Slider:SetPoint("TOPLEFT", fontDdl.Label, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+	StackEntry(textSizeSlider.Slider, colourSwatch, verticalSpacing + SLIDER_CHIP_OVERHANG)
 
 	local testBtn = mini:Button({
 		Parent = panel,
@@ -284,7 +308,7 @@ function M:Init()
 		end,
 	})
 
-	testBtn:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, verticalSpacing)
+	StackEntry(testBtn, textSizeSlider.Slider, verticalSpacing + SLIDER_RANGE_OVERHANG)
 
 	mini:RegisterSlashCommand(category, panel, {
 		"/minihr",
