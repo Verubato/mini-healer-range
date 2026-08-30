@@ -104,6 +104,13 @@ function M:Init()
 	local header = mini:PanelHeader({
 		Parent = panel,
 		Description = "Increase your awareness.",
+		Divider = true,
+		Reset = {
+			OnAccept = function()
+				mini:ResetSavedVars(dbDefaults)
+				addon:Refresh()
+			end,
+		},
 	})
 
 	local arenaChkBox = mini:Checkbox({
