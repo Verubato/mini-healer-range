@@ -5,6 +5,10 @@ local fw = require("TestFramework")
 local smoke = require("SmokeTest")
 local WowMock = require("WowMock")
 
+-- Mirrors FIELD_BORDER_LEFT and FIELD_BORDER_RIGHT in src/Config.lua.
+local FIELD_BORDER_LEFT = 6
+local FIELD_BORDER_RIGHT = 2
+
 ---The section rule is built by the framework and never handed back to the addon, so a test
 ---finds it the way a player sees it, by its label.
 ---@param text string
@@ -57,13 +61,49 @@ local function AcceptConfirm(open)
 	StaticPopupDialogs[seen.Which].OnAccept(nil, seen.Data)
 end
 
----Finds the control an appearance entry was built around, by the label the widget kept on it.
+---The appearance labels are plain font strings the panel owns, so a test finds one by its words.
 ---@param text string
 ---@return table?
-local function FindLabelled(text)
+local function FindLabel(text)
 	for _, frame in ipairs(WowMock.Frames) do
-		if frame.Label and frame.Label.GetText and frame.Label:GetText() == text then
-			return frame
+		for _, region in ipairs({ frame:GetRegions() }) do
+			if region.GetText and region:GetText() == text then
+				return region
+			end
+		end
+	end
+end
+
+---Every appearance control is anchored by its left edge to the label naming it.
+---@param text string
+---@return table?
+local function FindControlFor(text)
+	local label = FindLabel(text)
+
+	if not label then
+		return nil
+	end
+
+	for _, frame in ipairs(WowMock.Frames) do
+		for i = 1, frame:GetNumPoints() do
+			local point, relativeTo = frame:GetPoint(i)
+
+			if point == "LEFT" and relativeTo == label then
+				return frame
+			end
+		end
+	end
+end
+
+---@param region table
+---@param pointName string
+---@return table? relativeTo, number? x, string? relativePoint
+local function PointOn(region, pointName)
+	for i = 1, region:GetNumPoints() do
+		local point, relativeTo, relativePoint, x = region:GetPoint(i)
+
+		if point == pointName then
+			return relativeTo, x, relativePoint
 		end
 	end
 end
@@ -74,24 +114,14 @@ end
 ---@param aboveText string
 ---@return boolean
 local function StacksOnControl(text, aboveText)
-	local entry = FindLabelled(text)
-	local above = FindLabelled(aboveText)
+	local label = FindLabel(text)
+	local above = FindControlFor(aboveText)
 
-	if not entry or not above then
+	if not label or not above then
 		return false
 	end
 
-	local region = entry.Label or entry
-
-	for i = 1, region:GetNumPoints() do
-		local point, relativeTo = region:GetPoint(i)
-
-		if point == "TOP" then
-			return relativeTo == above
-		end
-	end
-
-	return false
+	return PointOn(label, "TOP") == above
 end
 
 ---The size slider sits below the colour row, so a test follows its own anchor rather than
@@ -106,56 +136,27 @@ local function SliderFollowsColourRow()
 		end
 	end
 
-	if not slider then
+	local swatch = FindControlFor("Colour")
+
+	if not slider or not swatch then
 		return false
 	end
 
-	local swatch = FindLabelled("Colour")
-
-	for i = 1, slider:GetNumPoints() do
-		local point, relativeTo = slider:GetPoint(i)
-
-		if point == "TOP" then
-			return swatch ~= nil and relativeTo == swatch
-		end
-	end
-
-	return false
+	return PointOn(slider, "TOP") == swatch
 end
 
----The swatch's label is flipped to its left, so the button hangs off the label rather than the
----other way round.
 ---@return boolean
-local function SwatchFollowsItsLabel()
-	for _, frame in ipairs(WowMock.Frames) do
-		if frame.Label and frame.Label.GetText and frame.Label:GetText() == "Colour" then
-			local _, relativeTo = frame:GetPoint()
+local function TestButtonSitsLeftOfReset()
+	local test = FindButton("Test")
+	local reset = FindButton("Reset to Defaults")
 
-			return relativeTo == frame.Label
-		end
-	end
-
-	return false
-end
-
----The test button flows under the slider instead of parking at the panel's bottom edge.
----@return boolean
-local function TestButtonFollowsSlider()
-	local btn = FindButton("Test")
-
-	if not btn then
+	if not test or not reset then
 		return false
 	end
 
-	for i = 1, btn:GetNumPoints() do
-		local point, relativeTo = btn:GetPoint(i)
+	local point, relativeTo, relativePoint = test:GetPoint()
 
-		if point == "TOP" then
-			return relativeTo ~= nil and relativeTo.GetObjectType and relativeTo:GetObjectType() == "Slider"
-		end
-	end
-
-	return false
+	return point == "RIGHT" and relativeTo == reset and relativePoint == "LEFT"
 end
 
 smoke.Run("MiniHealerRange", {
@@ -166,8 +167,45 @@ smoke.Run("MiniHealerRange", {
 		fw.truthy(SliderFollowsColourRow(), "the font size slider sits below the colour row")
 		fw.truthy(StacksOnControl("Outline", "Font"), "the outline row clears the font dropdown")
 		fw.truthy(StacksOnControl("Colour", "Outline"), "the colour row clears the outline dropdown")
-		fw.truthy(SwatchFollowsItsLabel(), "the colour swatch hangs off its label")
-		fw.truthy(TestButtonFollowsSlider(), "the test button flows under the slider")
+		fw.not_nil(FindControlFor("Colour"), "the colour swatch hangs off its label")
+		fw.truthy(TestButtonSitsLeftOfReset(), "the test button sits left of the reset button")
+
+		local entries = { "Message", "Font", "Outline", "Colour" }
+		local labelAnchor, labelX = PointOn(FindLabel("Message"), "LEFT")
+
+		for _, text in ipairs(entries) do
+			local anchor, x = PointOn(FindLabel(text), "LEFT")
+
+			fw.eq(anchor, labelAnchor, text .. " label shares the label column's anchor")
+			fw.eq(x, labelX, text .. " label shares the label column")
+		end
+
+		local _, controlX = PointOn(FindControlFor("Font"), "LEFT")
+
+		for _, text in ipairs(entries) do
+			local control = FindControlFor(text)
+			local relativeTo, x, relativePoint = PointOn(control, "LEFT")
+
+			-- Every control measures from its label's own left edge, so one offset puts them
+			-- all in the same column whatever the labels are worth.
+			fw.eq(relativeTo, FindLabel(text), text .. " control hangs off its own label")
+			fw.eq(relativePoint, "LEFT", text .. " control measures from its label's left edge")
+
+			if text == "Message" then
+				fw.eq(x - FIELD_BORDER_LEFT, controlX, "the message field's border sits on the control column")
+			else
+				fw.eq(x, controlX, text .. " control shares the control column")
+			end
+		end
+
+		local fontWidth = FindControlFor("Font"):GetWidth()
+
+		fw.eq(FindControlFor("Outline"):GetWidth(), fontWidth, "both dropdowns are the same length")
+		fw.eq(
+			FindControlFor("Message"):GetWidth() + FIELD_BORDER_LEFT + FIELD_BORDER_RIGHT,
+			fontWidth,
+			"the message field draws the same length as a dropdown"
+		)
 
 		local db = _G["MiniHealerRangeDB"]
 		db.FontSize = 99

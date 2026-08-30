@@ -24,10 +24,11 @@ local fontFlagNames = {
 	MONOCHROME = "Monochrome",
 	[""] = "None",
 }
--- The slider's value chip floats above its top edge, outside the frame's own rect.
-local SLIDER_CHIP_OVERHANG = 30
--- The slider's range labels hang below its bottom edge, outside the frame's own rect.
-local SLIDER_RANGE_OVERHANG = 12
+-- The legacy dropdown template draws its field in from the frame's own left edge.
+local LEGACY_DROPDOWN_INSET = 16
+-- The flattened field's border draws outside the box's own frame on both sides.
+local FIELD_BORDER_LEFT = 6
+local FIELD_BORDER_RIGHT = 2
 ---@class Db
 local db
 ---@class Db
@@ -109,6 +110,11 @@ function M:Init()
 		Parent = panel,
 		Description = "Increase your awareness.",
 		Divider = true,
+		Test = {
+			OnClick = function()
+				addon:ToggleTest()
+			end,
+		},
 		Reset = {
 			OnAccept = function()
 				mini:ResetSavedVars(dbDefaults)
@@ -197,9 +203,42 @@ function M:Init()
 		region:SetPoint("LEFT", appearanceDivider, "LEFT", 0, 0)
 	end
 
+	---@param text string
+	---@return table
+	local function CreateLabel(text)
+		local label = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+		label:SetText(text)
+
+		return label
+	end
+
+	local messageLabel = CreateLabel("Message")
+	local fontLabel = CreateLabel("Font")
+	local outlineLabel = CreateLabel("Outline")
+	local colourLabel = CreateLabel("Colour")
+
+	-- The widest label decides where every control starts, so the labels share one column and
+	-- the controls share another.
+	local labelColumn = 0
+
+	for _, label in ipairs({ messageLabel, fontLabel, outlineLabel, colourLabel }) do
+		labelColumn = math.max(labelColumn, label:GetStringWidth())
+	end
+
+	labelColumn = labelColumn + horizontalSpacing
+
+	local controlWidth = math.max(1, entryWidth - labelColumn)
+
+	---Puts a control in the second column, level with the label that names it.
+	---@param control table
+	---@param label table
+	---@param inset number? backed out of the column so the control's drawn edge lands on it
+	local function AttachControl(control, label, inset)
+		control:SetPoint("LEFT", label, "LEFT", labelColumn - (inset or 0), 0)
+	end
+
 	local messageEditBox = mini:EditBox({
 		Parent = panel,
-		LabelText = "Message",
 		GetValue = function()
 			return db.Message
 		end,
@@ -209,18 +248,17 @@ function M:Init()
 		end,
 	})
 
-	StackEntry(messageEditBox.Label, appearanceDivider, verticalSpacing)
-	messageEditBox.EditBox:SetPoint("LEFT", messageEditBox.Label, "RIGHT", horizontalSpacing, 0)
-	-- The label is only measurable once the widget has built it.
-	messageEditBox.EditBox:SetWidth(math.max(1, entryWidth - horizontalSpacing - messageEditBox.Label:GetStringWidth()))
+	StackEntry(messageLabel, appearanceDivider, verticalSpacing)
+	-- The box is inset so its border, not its frame, lands on the column.
+	messageEditBox.EditBox:SetPoint("LEFT", messageLabel, "LEFT", labelColumn + FIELD_BORDER_LEFT, 0)
+	messageEditBox.EditBox:SetWidth(math.max(1, controlWidth - FIELD_BORDER_LEFT - FIELD_BORDER_RIGHT))
 
 	local fontItems, fontNames = GetFontLists()
 
-	local fontDdl = mini:Dropdown({
+	local fontDdl, fontIsModern = mini:Dropdown({
 		Parent = panel,
-		LabelText = "Font",
 		Items = fontItems,
-		Width = entryWidth,
+		Width = controlWidth,
 		GetValue = function()
 			return db.FontPath
 		end,
@@ -233,15 +271,15 @@ function M:Init()
 		end,
 	})
 
-	-- A dropdown is taller than its label and sits centred on it, so the next entry clears
-	-- the control rather than the label.
-	StackEntry(fontDdl.Label, messageEditBox.EditBox, verticalSpacing)
+	local dropdownInset = fontIsModern and 0 or LEGACY_DROPDOWN_INSET
+
+	StackEntry(fontLabel, messageEditBox.EditBox, verticalSpacing)
+	AttachControl(fontDdl, fontLabel, dropdownInset)
 
 	local outlineDdl = mini:Dropdown({
 		Parent = panel,
-		LabelText = "Outline",
 		Items = fontFlagItems,
-		Width = entryWidth,
+		Width = controlWidth,
 		GetValue = function()
 			return db.FontFlags
 		end,
@@ -254,11 +292,12 @@ function M:Init()
 		end,
 	})
 
-	StackEntry(outlineDdl.Label, fontDdl, verticalSpacing)
+	StackEntry(outlineLabel, fontDdl, verticalSpacing)
+	AttachControl(outlineDdl, outlineLabel, dropdownInset)
 
 	local colourSwatch = mini:ColorSwatch({
 		Parent = panel,
-		LabelText = "Colour",
+		TooltipTitle = "Colour",
 		Tooltip = "Click to change the font colour.",
 		GetValue = function()
 			local c = db.FontColor
@@ -273,11 +312,8 @@ function M:Init()
 		end,
 	})
 
-	-- The swatch builds its label on the right, flipped here so every entry in the section
-	-- reads label first.
-	colourSwatch.Label:ClearAllPoints()
-	StackEntry(colourSwatch.Label, outlineDdl, verticalSpacing)
-	colourSwatch:SetPoint("LEFT", colourSwatch.Label, "RIGHT", horizontalSpacing, 0)
+	StackEntry(colourLabel, outlineDdl, verticalSpacing)
+	AttachControl(colourSwatch, colourLabel)
 
 	local textSizeSlider = mini:Slider({
 		Parent = panel,
@@ -296,19 +332,7 @@ function M:Init()
 		end,
 	})
 
-	StackEntry(textSizeSlider.Slider, colourSwatch, verticalSpacing + SLIDER_CHIP_OVERHANG)
-
-	local testBtn = mini:Button({
-		Parent = panel,
-		Text = "Test",
-		Width = 120,
-		Height = 26,
-		OnClick = function()
-			addon:ToggleTest()
-		end,
-	})
-
-	StackEntry(testBtn, textSizeSlider.Slider, verticalSpacing + SLIDER_RANGE_OVERHANG)
+	StackEntry(textSizeSlider.Slider, colourSwatch, verticalSpacing + mini.SliderChipOverhang)
 
 	mini:RegisterSlashCommand(category, panel, {
 		"/minihr",
