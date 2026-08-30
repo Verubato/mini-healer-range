@@ -29,6 +29,17 @@ local LEGACY_DROPDOWN_INSET = 16
 -- The flattened field's border draws outside the box's own frame on both sides.
 local FIELD_BORDER_LEFT = 6
 local FIELD_BORDER_RIGHT = 2
+-- Only the client's own locale takes the previewed file, so text in another script still
+-- renders from the game's own files.
+local FAMILY_ALPHABETS = { "roman", "korean", "simplifiedchinese", "traditionalchinese", "russian" }
+local LOCALE_ALPHABETS = {
+	koKR = "korean",
+	zhCN = "simplifiedchinese",
+	zhTW = "traditionalchinese",
+	ruRU = "russian",
+}
+-- The preview rows are menu rows, so their text matches the menu's own size.
+local PREVIEW_FONT_SIZE = 13
 ---@class Db
 local db
 ---@class Db
@@ -59,34 +70,163 @@ local dbDefaults = {
 		Dungeons = true,
 	},
 }
+-- The dropdown holds these tables, so they are refilled in place rather than replaced.
+local fontItems = {}
+local fontNames = {}
+local fontsDropdown
+local fontsMediaSubscribed = false
+local fontsRefreshQueued = false
+-- Cached per file, since CreateFontFamily needs a unique name per object and dropdown rows ask
+-- for the same handful of files over and over.
+local previewFontObjects = {}
+local previewFontObjectCount = 0
 ---@class Config
 local M = {
 	DbDefaults = dbDefaults,
 }
 addon.Config = M
 
-local function GetFontLists()
+---Refills the font lists in place from LibSharedMedia, falling back to the client's own faces
+---only when nothing has registered anything at all.
+local function RefillFontLists()
+	wipe(fontItems)
+	wipe(fontNames)
+
 	local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+	-- Fetch answers one override file for every name once an addon sets a global font.
+	local hash = lsm and lsm:HashTable("font")
 
-	if lsm then
-		local items = {}
-		local names = {}
-
+	if hash then
 		for _, name in ipairs(lsm:List("font") or {}) do
-			local file = lsm:Fetch("font", name)
+			local file = hash[name]
 
-			if file then
-				items[#items + 1] = file
-				names[file] = name
+			if file and not fontNames[file] then
+				fontItems[#fontItems + 1] = file
+				fontNames[file] = name
 			end
-		end
-
-		if #items > 0 then
-			return items, names
 		end
 	end
 
-	return builtinFontItems, builtinFontNames
+	if #fontItems == 0 then
+		for _, file in ipairs(builtinFontItems) do
+			fontItems[#fontItems + 1] = file
+			fontNames[file] = builtinFontNames[file]
+		end
+	end
+
+	table.sort(fontItems, function(a, b)
+		return (fontNames[a] or a) < (fontNames[b] or b)
+	end)
+end
+
+---Runs the list refresh once at the end of the frame however many times it is asked for in one,
+---since LibSharedMedia fires once per registered entry and a media pack registers its whole set
+---inside a single frame.
+local function QueueFontListsChanged()
+	if fontsRefreshQueued then
+		return
+	end
+
+	fontsRefreshQueued = true
+
+	C_Timer.After(0, function()
+		fontsRefreshQueued = false
+		RefillFontLists()
+
+		if fontsDropdown then
+			fontsDropdown:MiniRefresh()
+		end
+	end)
+end
+
+---Fonts keep arriving for as long as media addons keep loading, which is routinely after this
+---panel was built.
+local function EnsureFontMediaSubscription()
+	if fontsMediaSubscribed then
+		return
+	end
+
+	local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+
+	if not lsm or not lsm.RegisterCallback then
+		return
+	end
+
+	fontsMediaSubscribed = true
+
+	lsm.RegisterCallback(M, "LibSharedMedia_Registered", QueueFontListsChanged)
+end
+
+---One member per alphabet the client distinguishes.
+---@param file string
+---@return table[] members
+local function FamilyMembers(file)
+	local override = LOCALE_ALPHABETS[GetLocale()] or "roman"
+	local members = {}
+
+	for _, alphabet in ipairs(FAMILY_ALPHABETS) do
+		local memberFile = file
+
+		if alphabet ~= override and GameFontNormal and GameFontNormal.GetFontObjectForAlphabet then
+			local gameObject = GameFontNormal:GetFontObjectForAlphabet(alphabet)
+
+			memberFile = (gameObject and gameObject:GetFont()) or file
+		end
+
+		members[#members + 1] = {
+			alphabet = alphabet,
+			file = memberFile,
+			height = PREVIEW_FONT_SIZE,
+			flags = "",
+		}
+	end
+
+	return members
+end
+
+---A font object wearing this file's own face, for a dropdown row that previews the font it names.
+---SetFont answers false for a file the client is still loading, leaving the object undefined for
+---good.
+---@param file string
+---@return table? object
+local function PreviewFontObject(file)
+	if not CreateFontFamily then
+		return nil
+	end
+
+	local object = previewFontObjects[file]
+
+	if not object then
+		previewFontObjectCount = previewFontObjectCount + 1
+
+		object = CreateFontFamily(addonName .. "FontPreview" .. previewFontObjectCount, FamilyMembers(file))
+		previewFontObjects[file] = object
+	end
+
+	return object
+end
+
+---Previews the font each dropdown row names. Menu rows are pooled and reused across openings.
+---@param button table
+---@param file string
+local function DecorateFontRow(button, file)
+	local text = button.fontString
+
+	if not text then
+		return
+	end
+
+	if button.MiniHealerRangeStockFont == nil then
+		button.MiniHealerRangeStockFont = text:GetFontObject() or false
+	end
+
+	local preview = PreviewFontObject(file)
+
+	if preview then
+		text:SetFontObject(preview)
+	elseif button.MiniHealerRangeStockFont then
+		text:SetFontObject(button.MiniHealerRangeStockFont)
+	end
 end
 
 function M:Init()
@@ -253,7 +393,7 @@ function M:Init()
 	messageEditBox.EditBox:SetPoint("LEFT", messageLabel, "LEFT", labelColumn + FIELD_BORDER_LEFT, 0)
 	messageEditBox.EditBox:SetWidth(math.max(1, controlWidth - FIELD_BORDER_LEFT - FIELD_BORDER_RIGHT))
 
-	local fontItems, fontNames = GetFontLists()
+	RefillFontLists()
 
 	local fontDdl, fontIsModern = mini:Dropdown({
 		Parent = panel,
@@ -269,7 +409,11 @@ function M:Init()
 		GetText = function(value)
 			return fontNames[value] or value
 		end,
+		DecorateItem = DecorateFontRow,
 	})
+
+	fontsDropdown = fontDdl
+	EnsureFontMediaSubscription()
 
 	local dropdownInset = fontIsModern and 0 or LEGACY_DROPDOWN_INSET
 

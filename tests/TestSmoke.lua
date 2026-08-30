@@ -95,6 +95,103 @@ local function FindControlFor(text)
 	end
 end
 
+---A modern dropdown only exposes its choices through the generator it handed to SetupMenu, so a
+---test replays that generator against a description that keeps the callbacks.
+---@param dd table
+---@return table<string, fun()>
+local function MenuChoices(dd)
+	local choices = {}
+	local description = {}
+
+	setmetatable(description, {
+		__index = function()
+			return function() end
+		end,
+	})
+
+	description.CreateRadio = function(_, text, _, setSelected)
+		choices[text] = setSelected
+
+		return nil
+	end
+
+	dd.__menuGenerator(dd, description)
+
+	return choices
+end
+
+---MenuChoices keys rows by their text, so two rows sharing a name would collapse to one key
+---even when the list underneath still carries both. A row count catches that duplication.
+---@param dd table
+---@return number
+local function CountMenuChoices(dd)
+	local count = 0
+	local description = {}
+
+	setmetatable(description, {
+		__index = function()
+			return function() end
+		end,
+	})
+
+	description.CreateRadio = function()
+		count = count + 1
+
+		return nil
+	end
+
+	dd.__menuGenerator(dd, description)
+
+	return count
+end
+
+---The shared mock's own menu description has no AddInitializer, so calling a decorator directly
+---would stay green even if it were never wired to the dropdown. This replays the generator
+---against a description that keeps each row's captured initializer instead.
+---@param dd table
+---@return table<any, fun(button: table)>
+local function MenuInitializers(dd)
+	local initializers = {}
+	local description = {}
+
+	setmetatable(description, {
+		__index = function()
+			return function() end
+		end,
+	})
+
+	description.CreateRadio = function(_, _, _, _, value)
+		local node = {}
+
+		node.AddInitializer = function(_, initializer)
+			initializers[value] = initializer
+		end
+
+		return node
+	end
+
+	dd.__menuGenerator(dd, description)
+
+	return initializers
+end
+
+---A stand-in for a row's font string, tracking whichever font object it was last handed.
+---@param initial table?
+---@return table
+local function StubFontString(initial)
+	local stub = { object = initial }
+
+	function stub:GetFontObject()
+		return self.object
+	end
+
+	function stub:SetFontObject(object)
+		self.object = object
+	end
+
+	return stub
+end
+
 ---@param region table
 ---@param pointName string
 ---@return table? relativeTo, number? x, string? relativePoint
@@ -220,5 +317,79 @@ smoke.Run("MiniHealerRange", {
 
 		fw.eq(db.FontSize, context.Addon.Config.DbDefaults.FontSize, "reset restored FontSize")
 		fw.eq(db.Enabled.Arena, context.Addon.Config.DbDefaults.Enabled.Arena, "reset restored Enabled.Arena")
+
+		local fontDdl = FindControlFor("Font")
+		local newFontName = "MiniHealerRange Test Face"
+
+		fw.not_nil(fontDdl, "the font dropdown exists")
+
+		local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+		fw.not_nil(lsm, "LibSharedMedia resolves under the mock")
+
+		lsm:Register("font", newFontName, "Fonts\\MiniHealerRangeTestFace.ttf")
+
+		fw.no_key(MenuChoices(fontDdl), newFontName, "the registration alone doesn't rebuild the list yet")
+
+		WowMock.RunTimers()
+
+		fw.has_key(MenuChoices(fontDdl), newFontName, "the font appears once the coalesced refresh runs")
+
+		local secondFontName = "MiniHealerRange Second Test Face"
+		local thirdFontName = "MiniHealerRange Third Test Face"
+
+		lsm:Register("font", secondFontName, "Fonts\\MiniHealerRangeSecondTestFace.ttf")
+		lsm:Register("font", thirdFontName, "Fonts\\MiniHealerRangeThirdTestFace.ttf")
+
+		fw.eq(WowMock.RunTimers(), 1, "two registrations in one frame coalesce into a single refresh")
+		fw.has_key(MenuChoices(fontDdl), secondFontName, "the first of the pair lands after the one refresh")
+		fw.has_key(MenuChoices(fontDdl), thirdFontName, "the second of the pair lands after the same refresh")
+
+		local rowsBeforeSharedFile = CountMenuChoices(fontDdl)
+		local sharedFile = "Fonts\\MiniHealerRangeSharedFace.ttf"
+
+		lsm:Register("font", "MiniHealerRange Shared Name One", sharedFile)
+		lsm:Register("font", "MiniHealerRange Shared Name Two", sharedFile)
+
+		WowMock.RunTimers()
+
+		fw.eq(
+			CountMenuChoices(fontDdl) - rowsBeforeSharedFile,
+			1,
+			"two names resolving to one file add a single row"
+		)
+
+		local _, initializer = next(MenuInitializers(fontDdl))
+		fw.not_nil(initializer, "the font dropdown wires a row initializer")
+
+		local stockFont = {}
+		local button = { fontString = StubFontString(stockFont) }
+
+		initializer(button)
+
+		local previewed = button.fontString:GetFontObject()
+		fw.truthy(previewed ~= nil and previewed ~= stockFont, "the row previews the font it names")
+
+		-- A plain CreateFont object has no __members, and an incomplete family has fewer than
+		-- five, so this one count proves both the family route and the full alphabet list.
+		fw.eq(previewed.__members and #previewed.__members or 0, 5, "the preview is a family declaring all five alphabets")
+
+		local capturedStock = button.MiniHealerRangeStockFont
+		fw.eq(capturedStock, stockFont, "the row's original face is captured before the preview is applied")
+
+		initializer(button)
+		fw.eq(button.MiniHealerRangeStockFont, capturedStock, "a reopened row keeps the face it first captured")
+
+		-- Fetch would answer this one face for every name, leaving a single row naming a raw path.
+		lsm:SetGlobal("font", newFontName)
+		lsm:Register("font", "MiniHealerRange Overridden Face", "Fonts\\MiniHealerRangeOverriddenFace.ttf")
+
+		WowMock.RunTimers()
+
+		local overridden = MenuChoices(fontDdl)
+
+		fw.has_key(overridden, secondFontName, "a global font override leaves the other faces listed")
+		fw.has_key(overridden, "MiniHealerRange Overridden Face", "the face registered under the override lands too")
+
+		lsm:SetGlobal("font", nil)
 	end,
 })
