@@ -13,7 +13,7 @@ healer, and it does not run in the open world or in raid instances.
 | --- | --- |
 | Version | 1.5.4 |
 | Author | Verz |
-| Interface versions (TOC) | 120100, 50504, 40402, 38002, 38000, 30405, 20506, 11509 |
+| Interface versions (TOC) | 120100, 16001, 50504, 40402, 38002, 38000, 30405, 20506, 11509 |
 | Saved variables | MiniHealerRangeDB |
 | Slash commands | /minihr, /mhr (both open the settings panel) |
 | Options location | Game options -> AddOns -> MiniHealerRange |
