@@ -11,7 +11,7 @@ healer, and it does not run in the open world or in raid instances.
 
 | Item | Value |
 | --- | --- |
-| Version | 1.5.4 |
+| Version | 1.5.6 |
 | Author | Verz |
 | Interface versions (TOC) | 120100, 16001, 50504, 40402, 38002, 38000, 30405, 20506, 11509 |
 | Saved variables | MiniHealerRangeDB |
